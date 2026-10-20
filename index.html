@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PulseRip — YouTube & Media MP3/MP4 Downloader</title>
+    <meta name="description" content="Fast YouTube video link to MP3 and MP4 converter with selectable quality presets, bitrate controls, resolution options, audio trimming, and ID3 tagging." />
+    <meta property="og:title" content="PulseRip — YouTube & Media MP3/MP4 Downloader" />
+    <meta property="og:description" content="Fast YouTube video link to MP3 and MP4 converter with selectable quality presets, bitrate controls, resolution options, audio trimming, and ID3 tagging." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // Gracefully silence dev WebSocket / HMR disconnect events in iframe
+      window.addEventListener('error', function (e) {
+        if (
+          e.message &&
+          (e.message.indexOf('WebSocket') !== -1 ||
+            e.message.indexOf('@vite/client') !== -1 ||
+            e.message.indexOf('createWebSocketModuleRunnerTransport') !== -1)
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        var str = e.reason ? (e.reason.message || e.reason.stack || String(e.reason)) : '';
+        if (
+          str.indexOf('WebSocket') !== -1 ||
+          str.indexOf('@vite/client') !== -1 ||
+          str.indexOf('createWebSocketModuleRunnerTransport') !== -1
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

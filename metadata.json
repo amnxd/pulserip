@@ -1,0 +1,6 @@
+{
+  "name": "PulseRip — YouTube & Media MP3/MP4 Downloader",
+  "description": "Fast YouTube video link to MP3 and MP4 converter with selectable quality presets, bitrate controls, resolution options, audio trimming, and ID3 tagging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
