@@ -74,7 +74,32 @@ app.post('/api/resolve', async (req, res) => {
     }
 
     const trimmedUrl = url.trim();
-    const videoId = extractYouTubeId(trimmedUrl);
+    let videoId = extractYouTubeId(trimmedUrl);
+
+    // If input is a search query (e.g. "cartoon", "believer", "lofi") rather than a direct URL:
+    if (!videoId && !trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+      try {
+        const searchRes = await fetch(
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(trimmedUrl)}`,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          }
+        );
+        if (searchRes.ok) {
+          const html = await searchRes.text();
+          const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+          if (match && match[1]) {
+            videoId = match[1];
+          }
+        }
+      } catch (searchErr) {
+        console.warn('Search query resolution warning:', searchErr);
+      }
+    }
 
     if (videoId) {
       const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
@@ -240,29 +265,72 @@ app.post('/api/convert/start', async (req, res) => {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    const videoId = extractYouTubeId(url);
+    let videoId = extractYouTubeId(url);
+    if (!videoId && !url.startsWith('http://') && !url.startsWith('https://')) {
+      try {
+        const searchRes = await fetch(
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(url.trim())}`,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
+          }
+        );
+        if (searchRes.ok) {
+          const html = await searchRes.text();
+          const match = html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/);
+          if (match && match[1]) {
+            videoId = match[1];
+          }
+        }
+      } catch (searchErr) {
+        console.warn('Convert search error:', searchErr);
+      }
+    }
+
     const targetUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : url;
     const formatCode = mapFormatCode(format, quality);
 
-    const initRes = await fetch(
-      `https://loader.to/ajax/download.php?format=${formatCode}&url=${encodeURIComponent(targetUrl)}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-          'Referer': 'https://loader.to/',
-          'Accept': 'application/json, text/javascript, */*; q=0.01',
-        },
-      }
-    );
+    // Build format fallback sequence so if 1080p is unavailable for this video it falls back cleanly
+    const formatsToTry: string[] = [formatCode];
+    if (format === 'mp4') {
+      if (formatCode === '4k') formatsToTry.push('1440', '1080', '720');
+      else if (formatCode === '1440') formatsToTry.push('1080', '720');
+      else if (formatCode === '1080') formatsToTry.push('720', '480', '360');
+      else if (formatCode === '720') formatsToTry.push('480', '360');
+    }
 
-    const initText = await initRes.text();
     let initData: any = null;
-    try {
-      initData = JSON.parse(initText);
-    } catch (e) {
-      return res.status(503).json({
-        error: 'Internal server error. Please try again later.',
-      });
+    let effectiveQuality = quality;
+
+    for (const code of formatsToTry) {
+      try {
+        const initRes = await fetch(
+          `https://loader.to/ajax/download.php?format=${code}&url=${encodeURIComponent(targetUrl)}`,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+              'Referer': 'https://loader.to/',
+              'Accept': 'application/json, text/javascript, */*; q=0.01',
+            },
+          }
+        );
+
+        const initText = await initRes.text();
+        const parsed = JSON.parse(initText);
+        if (parsed && parsed.progress_url) {
+          initData = parsed;
+          if (code !== formatCode) {
+            effectiveQuality = code === '4k' ? '2160p' : `${code}p`;
+          }
+          break;
+        }
+      } catch (err) {
+        // Continue to fallback format
+      }
     }
 
     if (!initData || !initData.progress_url) {
@@ -274,7 +342,7 @@ app.post('/api/convert/start', async (req, res) => {
     const resolvedTitle = (initData.title || title || 'media').trim();
     const safeTitle = resolvedTitle.replace(/[\\/:*?"<>|]/g, '').trim() || 'media';
     const ext = format === 'mp3' ? 'mp3' : 'mp4';
-    const outputFilename = `${safeTitle} [${quality}].${ext}`;
+    const outputFilename = `${safeTitle} [${effectiveQuality}].${ext}`;
 
     return res.json({
       success: true,
@@ -282,7 +350,7 @@ app.post('/api/convert/start', async (req, res) => {
       title: safeTitle,
       filename: outputFilename,
       format,
-      quality,
+      quality: effectiveQuality,
     });
   } catch (err: any) {
     console.error('Convert start error:', err);
